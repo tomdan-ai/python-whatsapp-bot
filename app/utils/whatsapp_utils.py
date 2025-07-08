@@ -37,6 +37,10 @@ def send_message(data):
     }
 
     url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
+    
+    # Add logging for debugging
+    logging.info(f"Sending request to: {url}")
+    logging.info(f"Request data: {data}")
 
     try:
         response = requests.post(
@@ -50,6 +54,10 @@ def send_message(data):
         requests.RequestException
     ) as e:  # This will catch any general request exception
         logging.error(f"Request failed due to: {e}")
+        # Add detailed error response logging
+        if hasattr(e, 'response') and e.response is not None:
+            logging.error(f"Error response status: {e.response.status_code}")
+            logging.error(f"Error response body: {e.response.text}")
         return jsonify({"status": "error", "message": "Failed to send message"}), 500
     else:
         # Process the response as normal
@@ -89,7 +97,8 @@ def process_whatsapp_message(body):
     # response = generate_response(message_body, wa_id, name)
     # response = process_text_for_whatsapp(response)
 
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
+    # FIX: Send message back to the sender (wa_id) instead of RECIPIENT_WAID
+    data = get_text_message_input(wa_id, response)
     send_message(data)
 
 

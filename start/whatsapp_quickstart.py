@@ -18,6 +18,17 @@ VERSION = os.getenv("VERSION")
 APP_ID = os.getenv("APP_ID")
 APP_SECRET = os.getenv("APP_SECRET")
 
+# --- Start of logging ---
+print("--- Environment Variables Loaded ---")
+print(f"ACCESS_TOKEN: {ACCESS_TOKEN}")
+print(f"RECIPIENT_WAID: {RECIPIENT_WAID}")
+print(f"PHONE_NUMBER_ID: {PHONE_NUMBER_ID}")
+print(f"VERSION: {VERSION}")
+print(f"APP_ID: {APP_ID}")
+print(f"APP_SECRET: {APP_SECRET}")
+print("------------------------------------")
+# --- End of logging ---
+
 # --------------------------------------------------------------
 # Send a template WhatsApp message
 # --------------------------------------------------------------
