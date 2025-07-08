@@ -3,16 +3,14 @@ from flask import current_app, jsonify
 import json
 import requests
 import re
+from typing import List, Dict, Any
 
 from app.services.korra_chatbot import korra_bot
-from app.services.whatsapp_formatter import whatsapp_formatter
-
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
     logging.info(f"Content-type: {response.headers.get('content-type')}")
     logging.info(f"Body: {response.text}")
-
 
 def send_message(data):
     headers = {
@@ -44,7 +42,6 @@ def send_message(data):
         log_http_response(response)
         return response
 
-
 def process_text_for_whatsapp(text):
     # Remove brackets and format for WhatsApp
     pattern = r"\【.*?\】"
@@ -56,7 +53,6 @@ def process_text_for_whatsapp(text):
     whatsapp_style_text = re.sub(pattern, replacement, text)
     
     return whatsapp_style_text
-
 
 def process_whatsapp_message(body):
     """Process incoming WhatsApp message with Korra Chatbot"""
@@ -101,7 +97,6 @@ def process_whatsapp_message(body):
         data = whatsapp_formatter.create_text_message(wa_id, fallback_text)
         send_message(data)
 
-
 def is_valid_whatsapp_message(body):
     """Check if the incoming webhook event has a valid WhatsApp message structure."""
     return (
@@ -112,3 +107,94 @@ def is_valid_whatsapp_message(body):
         and body["entry"][0]["changes"][0]["value"].get("messages")
         and body["entry"][0]["changes"][0]["value"]["messages"][0]
     )
+
+class WhatsAppFormatter:
+    """Format messages for WhatsApp with buttons and interactive elements"""
+    
+    @staticmethod
+    def create_text_message(recipient: str, text: str) -> str:
+        """Create a simple text message"""
+        return json.dumps({
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual", 
+            "to": recipient,
+            "type": "text",
+            "text": {"preview_url": False, "body": text}
+        })
+    
+    @staticmethod
+    def create_interactive_message(recipient: str, text: str, suggestions: List[str]) -> str:
+        """Create an interactive message with buttons"""
+        
+        # WhatsApp allows max 3 buttons, so we'll take first 3 suggestions
+        buttons = []
+        for i, suggestion in enumerate(suggestions[:3]):
+            buttons.append({
+                "type": "reply",
+                "reply": {
+                    "id": f"btn_{i}",
+                    "title": suggestion[:20]  # WhatsApp button title limit
+                }
+            })
+        
+        if len(buttons) > 0:
+            message_data = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": recipient,
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": {"text": text},
+                    "action": {"buttons": buttons}
+                }
+            }
+        else:
+            # Fallback to text message if no buttons
+            message_data = {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": recipient,
+                "type": "text", 
+                "text": {"preview_url": False, "body": text}
+            }
+        
+        return json.dumps(message_data)
+    
+    @staticmethod
+    def create_list_message(recipient: str, header: str, body: str, options: List[Dict[str, str]]) -> str:
+        """Create a list message for more than 3 options"""
+        
+        sections = [{
+            "title": "Options",
+            "rows": []
+        }]
+        
+        for i, option in enumerate(options[:10]):  # WhatsApp allows max 10 rows
+            sections[0]["rows"].append({
+                "id": f"option_{i}",
+                "title": option.get("title", "Option")[:24],  # 24 char limit
+                "description": option.get("description", "")[:72]  # 72 char limit
+            })
+        
+        message_data = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": recipient,
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "header": {"type": "text", "text": header},
+                "body": {"text": body},
+                "footer": {"text": "Powered by Korra AI"},
+                "action": {
+                    "button": "View Options",
+                    "sections": sections
+                }
+            }
+        }
+        
+        return json.dumps(message_data)
+
+# Initialize formatter
+whatsapp_formatter = WhatsAppFormatter()
