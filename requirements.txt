@@ -8,13 +8,9 @@ dnspython
 pandas
 numpy
 scipy
-reportlab
 scikit-learn
-matplotlib
-seaborn
-PyPDF2
+reportlab
 python-docx
+PyPDF2
 openpyxl
 xlrd
-pdfplumber
-tabula-py

@@ -968,3 +968,51 @@ class KorraChatbot:
         except Exception as e:
             logging.error(f"Error formatting scenario response: {e}")
             return "❌ Error formatting scenario data"
+    
+    def handle_anomaly_analysis_request(self, user_id: str, message: str) -> Tuple[str, List[str]]:
+        """Handle anomaly detection and analysis requests"""
+        try:
+            from .anomaly_analyzer import create_anomaly_analyzer
+            analyzer = create_anomaly_analyzer(self.db_manager)
+            
+            # Determine type of analysis requested
+            if any(word in message.lower() for word in ['alert', 'critical', 'urgent']):
+                result = analyzer.get_anomaly_alerts(user_id)
+            else:
+                result = analyzer.run_full_analysis(user_id)
+            
+            if result.get("status") == "success":
+                response = self._format_anomaly_response(result)
+                suggestions = [
+                    "📊 View Details",
+                    "🚨 Critical Alerts",
+                    "💡 Get Recommendations", 
+                    "🔙 Main Menu"
+                ]
+            elif result.get("status") == "no_anomalies":
+                response = f"✅ *Great News!*\n\n{result.get('message')}\n\nYour business metrics look healthy with no significant anomalies detected."
+                suggestions = [
+                    "📈 Sales Forecast",
+                    "📊 Business Insights",
+                    "➕ Add More Data",
+                    "🔙 Main Menu"
+                ]
+            elif result.get("status") == "alerts_found":
+                response = self._format_alert_response(result)
+                suggestions = [
+                    "🔍 Investigate Issues",
+                    "✅ Mark Resolved",
+                    "📊 Full Analysis",
+                    "🔙 Main Menu"
+                ]
+            else:
+                response = f"❌ *Analysis Error*\n\n{result.get('message', 'Could not run anomaly analysis')}"
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling anomaly analysis: {e}")
+            response = "❌ Sorry, I couldn't run anomaly analysis right now. Please try again later."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
