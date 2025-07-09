@@ -203,11 +203,19 @@ class KorraChatbot:
         return []
     
     def _detect_intent(self, message: str) -> str:
-        """Detect user intent from message"""
+        """Detect user intent from message - Updated with forecasting"""
         
-        # Sales Forecasting
-        if any(keyword in message for keyword in ['forecast', 'predict', 'sales prediction', 'future sales', 'projection']):
+        # Sales Forecasting (Enhanced)
+        if any(keyword in message for keyword in ['forecast', 'predict', 'prediction', 'future sales', 'projection', 'what if', 'scenario']):
             return 'sales_forecast'
+        
+        # Forecast Comparison
+        if any(keyword in message for keyword in ['accuracy', 'compare forecast', 'actual vs predicted', 'how accurate']):
+            return 'forecast_comparison'
+        
+        # Scenario Analysis  
+        if any(keyword in message for keyword in ['scenario', 'what if', 'optimistic', 'pessimistic', 'best case', 'worst case']):
+            return 'scenario_analysis'
         
         # Anomaly Detection
         if any(keyword in message for keyword in ['anomaly', 'unusual', 'strange', 'drop', 'spike', 'alert', 'issue']):
@@ -232,7 +240,7 @@ class KorraChatbot:
         return 'general'
     
     def _generate_response(self, user_id: str, intent: str, message: str, user_name: str, user_session: Dict) -> Tuple[str, List[str]]:
-        """Generate response based on intent"""
+        """Generate response based on intent - Updated with forecasting"""
         
         # Get user context for AI (now includes database history)
         user_context = user_session.get('context', {})
@@ -249,7 +257,15 @@ class KorraChatbot:
                     for conv in recent_history[-3:]  # Last 3 messages
                 ]
         
-        # Try to use AI first, fall back to templates
+        # Handle forecasting intents first
+        if intent == 'sales_forecast':
+            return self.handle_forecasting_request(user_id, message)
+        elif intent == 'forecast_comparison':
+            return self.handle_forecast_comparison(user_id)
+        elif intent == 'scenario_analysis':
+            return self.handle_scenario_analysis(user_id, message)
+        
+        # Try to use AI for other intents, fall back to templates
         if self.ai_enabled and self.ai_service:
             try:
                 logging.info(f"Using {self.ai_provider} for intent: {intent}")
@@ -272,8 +288,6 @@ class KorraChatbot:
         logging.info(f"Using template response for intent: {intent}")
         if intent == 'greeting':
             return self._handle_greeting(user_name)
-        elif intent == 'sales_forecast':
-            return self._handle_sales_forecast(user_id, message)
         elif intent == 'anomaly_detection':
             return self._handle_anomaly_detection(user_id)
         elif intent == 'invoice_generation':
@@ -286,19 +300,31 @@ class KorraChatbot:
             return self._handle_general(user_id, message)
     
     def _get_suggestions_for_intent(self, intent: str) -> List[str]:
-        """Get appropriate suggestions based on intent"""
+        """Get appropriate suggestions based on intent - Updated with forecasting"""
         
         suggestion_map = {
             'greeting': [
-                "📊 Forecast Sales",
+                "📈 Sales Forecast",
                 "📄 Create Invoice", 
-                "📈 Business Insights",
+                "📊 Business Insights",
                 "🔍 Check Anomalies"
             ],
             'sales_forecast': [
-                "📈 Use Past Data",
-                "📤 Upload Spreadsheet", 
-                "📅 Weekly Forecast",
+                "📈 Quick Forecast",
+                "📅 Weekly Forecast", 
+                "🎯 Scenario Analysis",
+                "🔙 Main Menu"
+            ],
+            'forecast_comparison': [
+                "📈 New Forecast",
+                "🎯 Improve Accuracy",
+                "📊 View Details",
+                "🔙 Main Menu"
+            ],
+            'scenario_analysis': [
+                "📈 Optimistic View",
+                "📉 Conservative View",
+                "🎯 Custom Scenario",
                 "🔙 Main Menu"
             ],
             'anomaly_detection': [
@@ -326,9 +352,9 @@ class KorraChatbot:
                 "🔙 Main Menu"
             ],
             'general': [
-                "📊 Forecast Sales",
+                "📈 Sales Forecast",
                 "📄 Create Invoice",
-                "📈 View Insights", 
+                "📊 View Insights", 
                 "💡 Get Help"
             ]
         }
@@ -425,6 +451,520 @@ class KorraChatbot:
         ]
         
         return response, suggestions
-
-# Initialize the chatbot instance
-korra_bot = KorraChatbot()
+    
+    # Sales-specific handlers
+    def handle_sales_data_input(self, user_id: str, message: str) -> Tuple[str, List[str]]:
+        """Handle manual sales data input"""
+        try:
+            from .sales_models import SalesDataManager
+            sales_manager = SalesDataManager(self.db_manager)
+            
+            # Parse sales data from message
+            sales_data = self._parse_sales_input(message)
+            
+            if sales_data:
+                success = sales_manager.save_sales_record(user_id, sales_data)
+                
+                if success:
+                    response = f"✅ *Sales Record Saved*\n\n📦 Product: {sales_data['product_name']}\n💰 Amount: ${sales_data['total_amount']:.2f}\n📅 Date: {sales_data['date'].strftime('%Y-%m-%d')}\n\nWhat would you like to do next?"
+                    
+                    suggestions = [
+                        "➕ Add Another Sale",
+                        "📊 View Summary", 
+                        "📈 Sales Insights",
+                        "🔙 Main Menu"
+                    ]
+                else:
+                    response = "❌ Sorry, I couldn't save that sales record. Please try again or contact support."
+                    suggestions = ["🔙 Main Menu", "💡 Get Help"]
+            else:
+                response = "🤔 I couldn't understand the sales data. Please try this format:\n\n*Product name, quantity, price*\n\nExample: \"Coffee, 2, 5.50\" or \"Widget sold for $25\""
+                suggestions = ["💡 Show Examples", "📤 Upload File", "🔙 Main Menu"]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling sales input: {e}")
+            response = "❌ Sorry, there was an error processing your sales data. Please try again."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def handle_sales_insights_request(self, user_id: str) -> Tuple[str, List[str]]:
+        """Handle request for sales insights"""
+        try:
+            from .sales_analytics import SalesAnalytics
+            analytics = SalesAnalytics(self.db_manager)
+            
+            insights = analytics.generate_business_insights(user_id, 30)
+            
+            if insights.get("status") == "no_data":
+                response = "📊 *No Sales Data Found*\n\nI don't have any sales data to analyze yet. Let's get started!\n\nYou can:"
+                suggestions = [
+                    "➕ Add Sales Record",
+                    "📤 Upload Sales File",
+                    "💡 Learn More",
+                    "🔙 Main Menu"
+                ]
+            elif insights.get("status") == "error":
+                response = f"❌ Error generating insights: {insights.get('message', 'Unknown error')}"
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            else:
+                # Format insights for WhatsApp
+                response = self._format_insights_response(insights)
+                suggestions = [
+                    "📋 Detailed Report",
+                    "📊 Compare Periods",
+                    "💡 Get Recommendations",
+                    "🔙 Main Menu"
+                ]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling insights request: {e}")
+            response = "❌ Sorry, I couldn't generate insights right now. Please try again later."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def handle_file_upload(self, user_id: str, media_id: str, filename: str) -> Tuple[str, List[str]]:
+        """Handle file upload from WhatsApp"""
+        try:
+            from .file_processor import create_file_processor
+            file_processor = create_file_processor(self.db_manager)
+            
+            result = file_processor.process_whatsapp_document(media_id, user_id)
+            
+            if result["status"] == "success":
+                data = result.get("data", {})
+                response = f"✅ *File Processed Successfully*\n\n📁 File: {data.get('filename', 'Unknown')}\n📊 Records: {data.get('success_count', 0)} processed\n"
+                
+                if data.get("error_count", 0) > 0:
+                    response += f"⚠️ Errors: {data['error_count']} records had issues\n"
+                
+                response += "\nWhat would you like to do next?"
+                
+                suggestions = [
+                    "📈 View Insights",
+                    "📊 Sales Summary",
+                    "➕ Add More Data",
+                    "🔙 Main Menu"
+                ]
+                
+            elif result["status"] == "warning":
+                data = result.get("data", {})
+                response = f"⚠️ *Could Not Auto-Process File*\n\n📁 {data.get('filename', 'Unknown')}\n📊 Found {data.get('row_count', 0)} rows\n\nColumns: {', '.join(data.get('columns', [])[:5])}\n\nPlease check the format and try again."
+                
+                suggestions = [
+                    "💡 Format Help",
+                    "📤 Try Another File",
+                    "➕ Manual Entry",
+                    "🔙 Main Menu"
+                ]
+                
+            else:
+                response = f"❌ *File Processing Failed*\n\n{result.get('message', 'Unknown error')}\n\nPlease check your file format and try again."
+                
+                suggestions = [
+                    "💡 Format Help",
+                    "📤 Try Another File",
+                    "🔙 Main Menu"
+                ]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling file upload: {e}")
+            response = "❌ Sorry, I couldn't process your file. Please try again or contact support."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def _parse_sales_input(self, message: str) -> Optional[Dict]:
+        """Parse sales data from user message"""
+        try:
+            import re
+            
+            # Remove common prefixes
+            message = re.sub(r'^(sold|sale|add sale|record sale):\s*', '', message.lower().strip())
+            
+            # Try different patterns
+            patterns = [
+                # "Product, quantity, price" format
+                r'([^,]+),\s*(\d+(?:\.\d+)?),\s*\$?(\d+(?:\.\d+)?)',
+                # "Product for $amount" format
+                r'([^,]+?)\s+(?:for|sold for|\$)\s*\$?(\d+(?:\.\d+)?)',
+                # "Quantity Product at $price" format
+                r'(\d+(?:\.\d+)?)\s+([^,]+?)\s+(?:at|@|\$)\s*\$?(\d+(?:\.\d+)?)',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, message)
+                if match:
+                    groups = match.groups()
+                    
+                    if len(groups) == 3:
+                        if pattern == patterns[0]:  # product, qty, price
+                            product, quantity, price = groups
+                            return {
+                                'product_name': product.strip().title(),
+                                'quantity': float(quantity),
+                                'unit_price': float(price),
+                                'total_amount': float(quantity) * float(price),
+                                'date': datetime.utcnow(),
+                                'customer_name': '',
+                                'source': 'chat_input'
+                            }
+                        elif pattern == patterns[2]:  # qty product at price
+                            quantity, product, price = groups
+                            return {
+                                'product_name': product.strip().title(),
+                                'quantity': float(quantity),
+                                'unit_price': float(price),
+                                'total_amount': float(quantity) * float(price),
+                                'date': datetime.utcnow(),
+                                'customer_name': '',
+                                'source': 'chat_input'
+                            }
+                    elif len(groups) == 2:  # product for amount
+                        product, amount = groups
+                        return {
+                            'product_name': product.strip().title(),
+                            'quantity': 1.0,
+                            'unit_price': float(amount),
+                            'total_amount': float(amount),
+                            'date': datetime.utcnow(),
+                            'customer_name': '',
+                            'source': 'chat_input'
+                        }
+            
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error parsing sales input: {e}")
+            return None
+    
+    def _format_insights_response(self, insights: Dict) -> str:
+        """Format insights data for WhatsApp display"""
+        try:
+            summary = insights.get("summary", {})
+            trends = insights.get("trends", {})
+            insight_points = insights.get("insights", [])
+            
+            response = f"📈 *Business Insights* - {insights.get('period', 'Recent')}\n\n"
+            
+            # Summary stats
+            total_revenue = summary.get("total_revenue", 0)
+            total_sales = summary.get("total_sales", 0)
+            avg_order_value = summary.get("average_order_value", 0)
+            
+            response += f"💰 Revenue: ${total_revenue:,.2f}\n"
+            response += f"📊 Sales: {total_sales} transactions\n"
+            response += f"🎯 Avg Order: ${avg_order_value:.2f}\n\n"
+            
+            # Top product
+            top_products = summary.get("top_products", [])
+            if top_products:
+                top_product = top_products[0]
+                response += f"🏆 Best Seller: {top_product['name']}\n"
+                response += f"   Revenue: ${top_product['revenue']:.2f}\n\n"
+            
+            # Key trends
+            if trends:
+                revenue_trend = trends.get("revenue_trend", {})
+                if revenue_trend:
+                    direction = "📈" if revenue_trend["direction"] == "up" else "📉"
+                    change = revenue_trend["change_percent"]
+                    response += f"{direction} Revenue trend: {change:+.1f}%\n"
+            
+            # Top insights
+            if insight_points:
+                response += "\n*Key Insights:*\n"
+                for insight in insight_points[:3]:  # Show top 3
+                    response += f"• {insight}\n"
+            
+            return response.strip()
+            
+        except Exception as e:
+            logging.error(f"Error formatting insights: {e}")
+            return "❌ Error formatting insights data"
+    
+    # Sales Forecasting handlers
+    def handle_forecasting_request(self, user_id: str, message: str) -> Tuple[str, List[str]]:
+        """Handle sales forecasting requests"""
+        try:
+            from .sales_forecasting import SalesForecasting
+            forecaster = SalesForecasting(self.db_manager)
+            
+            # Parse forecasting request
+            forecast_type = self._parse_forecast_request(message)
+            
+            if forecast_type == "quick":
+                result = forecaster.generate_quick_forecast(user_id)
+            elif forecast_type == "weekly":
+                result = forecaster.generate_weekly_forecast(user_id)
+            elif forecast_type == "monthly":
+                result = forecaster.generate_monthly_forecast(user_id)
+            elif forecast_type == "trend":
+                result = forecaster.analyze_trends(user_id)
+            else:
+                # Default to quick forecast
+                result = forecaster.generate_quick_forecast(user_id)
+            
+            if result.get("status") == "success":
+                response = self._format_forecast_response(result)
+                suggestions = [
+                    "📊 View Details",
+                    "📈 Weekly Forecast", 
+                    "📅 Monthly Forecast",
+                    "🔙 Main Menu"
+                ]
+            elif result.get("status") == "insufficient_data":
+                response = f"📊 *Need More Data for Forecasting*\n\n{result.get('message', 'Not enough sales data')}\n\nTo generate accurate forecasts, I need:\n• At least 7 days of sales data\n• Multiple sales records\n• Consistent data entry"
+                suggestions = [
+                    "➕ Add Sales Data",
+                    "📤 Upload Sales File",
+                    "💡 Learn More",
+                    "🔙 Main Menu"
+                ]
+            else:
+                response = f"❌ *Forecasting Error*\n\n{result.get('message', 'Could not generate forecast')}"
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling forecasting request: {e}")
+            response = "❌ Sorry, I couldn't generate a forecast right now. Please try again later."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def handle_forecast_comparison(self, user_id: str) -> Tuple[str, List[str]]:
+        """Handle forecast vs actual comparison"""
+        try:
+            from .sales_forecasting import SalesForecasting
+            forecaster = SalesForecasting(self.db_manager)
+            
+            comparison = forecaster.compare_forecast_vs_actual(user_id)
+            
+            if comparison.get("status") == "success":
+                response = self._format_comparison_response(comparison)
+                suggestions = [
+                    "📈 New Forecast",
+                    "📊 Accuracy Details",
+                    "🎯 Improve Accuracy",
+                    "🔙 Main Menu"
+                ]
+            elif comparison.get("status") == "no_forecasts":
+                response = "📊 *No Previous Forecasts*\n\nI don't have any previous forecasts to compare with actual results.\n\nLet's create your first forecast!"
+                suggestions = [
+                    "📈 Quick Forecast",
+                    "📅 Weekly Forecast",
+                    "📤 Upload Data",
+                    "🔙 Main Menu"
+                ]
+            else:
+                response = f"❌ *Comparison Error*\n\n{comparison.get('message', 'Could not compare forecasts')}"
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling forecast comparison: {e}")
+            response = "❌ Sorry, I couldn't compare forecasts right now. Please try again later."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def handle_scenario_analysis(self, user_id: str, message: str) -> Tuple[str, List[str]]:
+        """Handle what-if scenario analysis"""
+        try:
+            from .sales_forecasting import SalesForecasting
+            forecaster = SalesForecasting(self.db_manager)
+            
+            # Parse scenario from message
+            scenario = self._parse_scenario_request(message)
+            
+            result = forecaster.generate_scenario_forecast(user_id, scenario)
+            
+            if result.get("status") == "success":
+                response = self._format_scenario_response(result, scenario)
+                suggestions = [
+                    "📈 Optimistic Scenario",
+                    "📉 Conservative Scenario",
+                    "🎯 Custom Scenario",
+                    "🔙 Main Menu"
+                ]
+            else:
+                response = f"❌ *Scenario Analysis Error*\n\n{result.get('message', 'Could not analyze scenario')}"
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            
+            return response, suggestions
+            
+        except Exception as e:
+            logging.error(f"Error handling scenario analysis: {e}")
+            response = "❌ Sorry, I couldn't analyze scenarios right now. Please try again later."
+            suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            return response, suggestions
+    
+    def _parse_forecast_request(self, message: str) -> str:
+        """Parse the type of forecast requested"""
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in ['quick', 'fast', 'brief', 'summary']):
+            return "quick"
+        elif any(word in message_lower for word in ['week', 'weekly', '7 day']):
+            return "weekly"
+        elif any(word in message_lower for word in ['month', 'monthly', '30 day']):
+            return "monthly"
+        elif any(word in message_lower for word in ['trend', 'pattern', 'direction']):
+            return "trend"
+        else:
+            return "quick"  # Default
+    
+    def _parse_scenario_request(self, message: str) -> Dict:
+        """Parse scenario parameters from message"""
+        message_lower = message.lower()
+        
+        scenario = {
+            "type": "normal",
+            "growth_rate": 0.0,
+            "market_conditions": "normal"
+        }
+        
+        if any(word in message_lower for word in ['optimistic', 'best case', 'good', 'growth']):
+            scenario["type"] = "optimistic"
+            scenario["growth_rate"] = 0.15  # 15% growth
+            scenario["market_conditions"] = "favorable"
+        elif any(word in message_lower for word in ['pessimistic', 'worst case', 'bad', 'decline']):
+            scenario["type"] = "pessimistic"
+            scenario["growth_rate"] = -0.10  # 10% decline
+            scenario["market_conditions"] = "unfavorable"
+        elif any(word in message_lower for word in ['conservative', 'cautious', 'steady']):
+            scenario["type"] = "conservative"
+            scenario["growth_rate"] = 0.05  # 5% growth
+            scenario["market_conditions"] = "stable"
+        
+        return scenario
+    
+    def _format_forecast_response(self, result: Dict) -> str:
+        """Format forecast results for WhatsApp display"""
+        try:
+            forecast_data = result.get("forecast", {})
+            
+            response = f"📈 *Sales Forecast* - {forecast_data.get('period', 'Next Period')}\n\n"
+            
+            # Main prediction
+            predicted_revenue = forecast_data.get("predicted_revenue", 0)
+            predicted_sales = forecast_data.get("predicted_sales", 0)
+            confidence = forecast_data.get("confidence_score", 0)
+            
+            response += f"💰 Predicted Revenue: ${predicted_revenue:,.2f}\n"
+            response += f"📊 Predicted Sales: {predicted_sales} transactions\n"
+            response += f"🎯 Confidence: {confidence:.1%}\n\n"
+            
+            # Trend information
+            trend = forecast_data.get("trend", {})
+            if trend:
+                direction = trend.get("direction", "stable")
+                magnitude = trend.get("magnitude", 0)
+                
+                if direction == "increasing":
+                    response += f"📈 Trend: Growing by {magnitude:.1%}\n"
+                elif direction == "decreasing":
+                    response += f"📉 Trend: Declining by {magnitude:.1%}\n"
+                else:
+                    response += f"➡️ Trend: Stable\n"
+            
+            # Key insights
+            insights = forecast_data.get("insights", [])
+            if insights:
+                response += "\n*Key Points:*\n"
+                for insight in insights[:3]:  # Show top 3
+                    response += f"• {insight}\n"
+            
+            # Recommendations
+            recommendations = forecast_data.get("recommendations", [])
+            if recommendations:
+                response += "\n*Recommendations:*\n"
+                for rec in recommendations[:2]:  # Show top 2
+                    response += f"• {rec}\n"
+            
+            return response.strip()
+            
+        except Exception as e:
+            logging.error(f"Error formatting forecast response: {e}")
+            return "❌ Error formatting forecast data"
+    
+    def _format_comparison_response(self, comparison: Dict) -> str:
+        """Format forecast comparison results"""
+        try:
+            accuracy = comparison.get("accuracy", {})
+            
+            response = "📊 *Forecast vs Actual Results*\n\n"
+            
+            # Overall accuracy
+            overall_accuracy = accuracy.get("overall_accuracy", 0)
+            response += f"🎯 Overall Accuracy: {overall_accuracy:.1%}\n\n"
+            
+            # Revenue comparison
+            revenue_comparison = comparison.get("revenue_comparison", {})
+            if revenue_comparison:
+                predicted = revenue_comparison.get("predicted", 0)
+                actual = revenue_comparison.get("actual", 0)
+                accuracy_pct = revenue_comparison.get("accuracy", 0)
+                
+                response += f"💰 Revenue Accuracy: {accuracy_pct:.1%}\n"
+                response += f"   Predicted: ${predicted:,.2f}\n"
+                response += f"   Actual: ${actual:,.2f}\n\n"
+            
+            # Performance insights
+            insights = comparison.get("insights", [])
+            if insights:
+                response += "*Performance Insights:*\n"
+                for insight in insights[:3]:
+                    response += f"• {insight}\n"
+            
+            return response.strip()
+            
+        except Exception as e:
+            logging.error(f"Error formatting comparison response: {e}")
+            return "❌ Error formatting comparison data"
+    
+    def _format_scenario_response(self, result: Dict, scenario: Dict) -> str:
+        """Format scenario analysis results"""
+        try:
+            scenario_data = result.get("scenario_forecast", {})
+            scenario_type = scenario.get("type", "normal").title()
+            
+            response = f"🎯 *{scenario_type} Scenario Analysis*\n\n"
+            
+            # Scenario predictions
+            predicted_revenue = scenario_data.get("predicted_revenue", 0)
+            baseline_revenue = result.get("baseline_revenue", 0)
+            
+            response += f"💰 Scenario Revenue: ${predicted_revenue:,.2f}\n"
+            response += f"📊 Baseline Revenue: ${baseline_revenue:,.2f}\n"
+            
+            if baseline_revenue > 0:
+                difference = predicted_revenue - baseline_revenue
+                diff_pct = (difference / baseline_revenue) * 100
+                
+                if difference > 0:
+                    response += f"📈 Upside: +${difference:,.2f} ({diff_pct:+.1f}%)\n"
+                else:
+                    response += f"📉 Risk: ${difference:,.2f} ({diff_pct:+.1f}%)\n"
+            
+            response += f"\n*Scenario Assumptions:*\n"
+            response += f"• Market Conditions: {scenario.get('market_conditions', 'Normal')}\n"
+            response += f"• Growth Rate: {scenario.get('growth_rate', 0):+.1%}\n"
+            
+            # Scenario insights
+            insights = scenario_data.get("insights", [])
+            if insights:
+                response += "\n*Key Insights:*\n"
+                for insight in insights[:2]:
+                    response += f"• {insight}\n"
+            
+            return response.strip()
+            
+        except Exception as e:
+            logging.error(f"Error formatting scenario response: {e}")
+            return "❌ Error formatting scenario data"

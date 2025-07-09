@@ -1,12 +1,5 @@
 flask
 python-dotenv
-openai
-aiohttp
-requests
-gunicorn
-
-flask
-python-dotenv
 requests
 gunicorn
 aiohttp
@@ -16,3 +9,12 @@ pandas
 numpy
 scipy
 reportlab
+scikit-learn
+matplotlib
+seaborn
+PyPDF2
+python-docx
+openpyxl
+xlrd
+pdfplumber
+tabula-py

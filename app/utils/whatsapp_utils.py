@@ -89,8 +89,34 @@ def process_whatsapp_message(body):
                 message_body = "Interactive message received"
         elif message_data["type"] == "document":
             message_type = "document"
-            message_body = "Document uploaded"
-            # Could process document here in future
+            document_info = message_data["document"]
+            media_id = document_info.get("id")
+            filename = document_info.get("filename", "uploaded_file")
+            
+            logging.info(f"Document uploaded: {filename} (ID: {media_id})")
+            
+            # Handle document with Korra
+            if media_id:
+                response_text, suggestions = korra_bot.handle_file_upload(wa_id, media_id, filename)
+            else:
+                response_text = "❌ Sorry, I couldn't process your document. Please try uploading again."
+                suggestions = ["🔄 Try Again", "🔙 Main Menu"]
+            
+            # Format and send response
+            response_text = process_text_for_whatsapp(response_text)
+            
+            if suggestions and len(suggestions) > 0:
+                if len(suggestions) <= 3:
+                    data = whatsapp_formatter.create_interactive_message(wa_id, response_text, suggestions)
+                else:
+                    list_options = [{"title": suggestion, "description": ""} for suggestion in suggestions[:10]]
+                    data = whatsapp_formatter.create_list_message(wa_id, "File Processing", response_text, list_options)
+            else:
+                data = whatsapp_formatter.create_text_message(wa_id, response_text)
+            
+            send_message(data)
+            return  # Early return for document handling
+            
         elif message_data["type"] == "image":
             message_type = "image"
             message_body = "Image uploaded"
@@ -110,8 +136,16 @@ def process_whatsapp_message(body):
                 "message_length": len(message_body)
             })
         
-        # Process with enhanced Korra Chatbot (now with MongoDB persistence)
-        response_text, suggestions = korra_bot.process_message(wa_id, message_body, name)
+        # Check for sales data input patterns
+        if message_type == "text" and any(keyword in message_body.lower() for keyword in ['sold', 'sale', 'add sale', 'record sale']):
+            # Handle sales data input
+            response_text, suggestions = korra_bot.handle_sales_data_input(wa_id, message_body)
+        elif message_type == "text" and any(keyword in message_body.lower() for keyword in ['insights', 'analytics', 'summary', 'report']):
+            # Handle insights request
+            response_text, suggestions = korra_bot.handle_sales_insights_request(wa_id)
+        else:
+            # Process with standard Korra Chatbot
+            response_text, suggestions = korra_bot.process_message(wa_id, message_body, name)
         
         # Format response for WhatsApp
         response_text = process_text_for_whatsapp(response_text)
