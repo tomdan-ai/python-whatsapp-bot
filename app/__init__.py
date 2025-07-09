@@ -10,7 +10,25 @@ def create_app():
     load_configurations(app)
     configure_logging()
 
-    # Import and register blueprints, if any
+    # Initialize database and chatbot within app context
+    with app.app_context():
+        # Initialize MongoDB
+        try:
+            from .models.database import db_manager
+            db_manager.initialize_db()
+        except ImportError as e:
+            import logging
+            logging.warning(f"Database initialization failed: {e}")
+        
+        # Initialize Korra Chatbot with database
+        try:
+            from .services.korra_chatbot import korra_bot
+            korra_bot.initialize_database()
+        except ImportError as e:
+            import logging
+            logging.warning(f"Chatbot initialization failed: {e}")
+
+    # Import and register blueprints
     app.register_blueprint(webhook_blueprint)
 
     return app

@@ -23,7 +23,11 @@ def load_configurations(app):
     app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     app.config["OPENAI_ASSISTANT_ID"] = os.getenv("OPENAI_ASSISTANT_ID")
     
-    # Database Configuration
+    # MongoDB Configuration
+    app.config["MONGODB_URI"] = os.getenv("MONGODB_URI")
+    app.config["MONGODB_DATABASE"] = os.getenv("MONGODB_DATABASE", "korra_bot")
+    
+    # Legacy Database Configuration (backup)
     app.config["DATABASE_URL"] = os.getenv("DATABASE_URL", "sqlite:///korra_bot.db")
     
     # Flask Configuration

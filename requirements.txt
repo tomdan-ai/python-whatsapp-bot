@@ -4,3 +4,15 @@ openai
 aiohttp
 requests
 gunicorn
+
+flask
+python-dotenv
+requests
+gunicorn
+aiohttp
+pymongo
+dnspython
+pandas
+numpy
+scipy
+reportlab
