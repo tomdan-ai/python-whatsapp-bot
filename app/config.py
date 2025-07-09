@@ -17,8 +17,11 @@ def load_configurations(app):
     app.config["PHONE_NUMBER_ID"] = os.getenv("PHONE_NUMBER_ID")
     app.config["VERIFY_TOKEN"] = os.getenv("VERIFY_TOKEN")
     
-    # AI Configuration
+    # AI Configuration (Priority: OpenRouter -> DeepSeek -> OpenAI)
+    app.config["OPENROUTER_API_KEY"] = os.getenv("OPENROUTER_API_KEY")
     app.config["DEEPSEEK_API_KEY"] = os.getenv("DEEPSEEK_API_KEY")
+    app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+    app.config["OPENAI_ASSISTANT_ID"] = os.getenv("OPENAI_ASSISTANT_ID")
     
     # Database Configuration
     app.config["DATABASE_URL"] = os.getenv("DATABASE_URL", "sqlite:///korra_bot.db")
@@ -26,10 +29,6 @@ def load_configurations(app):
     # Flask Configuration
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "korra_chatbot_secret_key_2025")
     app.config["FLASK_ENV"] = os.getenv("FLASK_ENV", "development")
-    
-    # Legacy OpenAI (backup)
-    app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-    app.config["OPENAI_ASSISTANT_ID"] = os.getenv("OPENAI_ASSISTANT_ID")
 
 
 def configure_logging():

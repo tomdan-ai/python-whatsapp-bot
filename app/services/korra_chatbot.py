@@ -13,16 +13,30 @@ class KorraChatbot:
         self.conversation_context = {}
         self.user_sessions = {}
         
-        # Import DeepSeek service here to avoid circular imports
+        # Try to import AI services in order of preference
+        self.ai_service = None
+        self.ai_enabled = False
+        
+        # Try OpenRouter first (free models)
         try:
-            from .deepseek_service import deepseek_service
-            self.ai_service = deepseek_service
+            from .openrouter_service import openrouter_service
+            self.ai_service = openrouter_service
             self.ai_enabled = True
-            logging.info("DeepSeek AI service loaded successfully")
-        except ImportError as e:
-            logging.warning(f"Could not import DeepSeek service: {e}")
-            self.ai_service = None
-            self.ai_enabled = False
+            self.ai_provider = "OpenRouter"
+            logging.info("OpenRouter AI service loaded successfully")
+        except ImportError:
+            # Fallback to DeepSeek
+            try:
+                from .deepseek_service import deepseek_service
+                self.ai_service = deepseek_service
+                self.ai_enabled = True
+                self.ai_provider = "DeepSeek"
+                logging.info("DeepSeek AI service loaded successfully")
+            except ImportError as e:
+                logging.warning(f"Could not import AI services: {e}")
+                self.ai_service = None
+                self.ai_enabled = False
+                self.ai_provider = "None"
         
     def process_message(self, user_id: str, message: str, user_name: str) -> Tuple[str, List[str]]:
         """
@@ -110,6 +124,7 @@ class KorraChatbot:
         # Try to use AI first, fall back to templates
         if self.ai_enabled and self.ai_service:
             try:
+                logging.info(f"Using {self.ai_provider} for intent: {intent}")
                 ai_response = self.ai_service.generate_business_response(
                     user_message=message,
                     intent=intent,
@@ -126,6 +141,7 @@ class KorraChatbot:
                 # Fall back to template responses
         
         # Template fallback responses
+        logging.info(f"Using template response for intent: {intent}")
         if intent == 'greeting':
             return self._handle_greeting(user_name)
         elif intent == 'sales_forecast':
@@ -171,7 +187,7 @@ class KorraChatbot:
             ],
             'business_insights': [
                 "📋 Full Report",
-                "📊 Compare Months",
+                "📊 Compare Periods",
                 "🎯 Growth Tips",
                 "🔙 Main Menu"
             ],
