@@ -9,8 +9,11 @@ def create_app():
     # Load configurations and logging settings
     load_configurations(app)
     configure_logging()
+    
+    # Register blueprints
+    app.register_blueprint(webhook_blueprint)
 
-    # Initialize database and chatbot within app context
+    # Initialize services when app context is available
     with app.app_context():
         # Initialize MongoDB
         try:
@@ -27,8 +30,5 @@ def create_app():
         except ImportError as e:
             import logging
             logging.warning(f"Chatbot initialization failed: {e}")
-
-    # Import and register blueprints
-    app.register_blueprint(webhook_blueprint)
 
     return app
