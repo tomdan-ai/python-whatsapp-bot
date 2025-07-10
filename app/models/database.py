@@ -150,7 +150,7 @@ class MongoDBManager:
             return False
     
     # Conversation History Management
-    def save_conversation(self, user_id: str, message: str, message_type: str, intent: str = None, ai_provider: str = None) -> bool:
+    def save_conversation(self, user_id: str, message: str, message_type: str, intent: str = None, ai_provider: str = None, metadata: Dict = None) -> bool:
         """Save conversation message"""
         try:
             if not self.collections:
@@ -162,6 +162,7 @@ class MongoDBManager:
                 "message_type": message_type,  # 'user' or 'bot'
                 "intent": intent,
                 "ai_provider": ai_provider,
+                "metadata": metadata or {},
                 "timestamp": datetime.utcnow(),
                 "session_id": f"{user_id}_{datetime.utcnow().strftime('%Y%m%d')}"
             }
